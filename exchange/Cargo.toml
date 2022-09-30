@@ -4,3 +4,5 @@ version = "0.1.0"
 authors = ["An Devloper <an.devloper@example.com>"]
 
 [dependencies]
+strum = "0.24"
+strum_macros = "0.24"
