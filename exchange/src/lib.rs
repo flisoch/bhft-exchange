@@ -1,19 +1,15 @@
-mod assets_names;
+#![allow(unused)]
+extern crate strum;
+extern crate strum_macros;
 
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
-}
+mod asset_name;
+mod trader;
+mod deserialize;
+mod order;
+
+use std::fs::File;
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_add() {
-        assert_eq!(add(1,2), 3);
-    }
-
-    fn test_assets_enum() {
-        assert_eq!(Asset::A.as_static(), "A");
-    }
 }

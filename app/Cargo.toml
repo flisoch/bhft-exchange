@@ -1,8 +1,0 @@
-[package]
-name = "app"
-version = "0.1.0"
-authors = ["An Devloper <an.devloper@example.com>"]
-
-[dependencies]
-exchange = {path = "../exchange"}
-time = "0.1.12"

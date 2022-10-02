@@ -1,4 +1,0 @@
-struct Trader {
-    name: String,
-    
-}
