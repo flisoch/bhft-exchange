@@ -29,8 +29,9 @@ pub struct Order {
     pub limit: Option<Rc<RefCell<Limit>>>,
 }
 
-impl Deserialize<usize, Order> for Order {
-    fn deserialize(serialized_str: String) -> Order {
+impl Deserialize<usize, Rc<RefCell<Order>>> for Order {
+
+    fn deserialize(serialized_str: String) -> Rc<RefCell<Order>> {
         let parts: Vec<&str> = serialized_str.split(' ').collect();
 
         let trader_name: String = parts[0].to_string();
@@ -39,7 +40,7 @@ impl Deserialize<usize, Order> for Order {
         let price = parts[3].parse::<u64>().expect("Can't parse to u64");
         let amount = parts[4].parse::<u64>().expect("Can't parse to u64");
 
-        Order {
+        let order = Order {
             id: usize::MAX,
             trader_name: trader_name,
             direction: direction,
@@ -47,17 +48,18 @@ impl Deserialize<usize, Order> for Order {
             price: price,
             amount: amount,
             limit: None,
-        }
+        };
+        Rc::new(RefCell::new(order))
     }
 
-    fn deserialize_all() -> HashMap<usize, Order> {
+    fn deserialize_all() -> HashMap<usize, Rc<RefCell<Order>>> {
         let mut orders = HashMap::new();
         let lines = Self::read_lines(Path::new("./resources/orders.txt"));
         for line in lines {
             if let Ok(serialized_order) = line {
                 let mut order = Self::deserialize(serialized_order);
-                order.id = orders.len();
-                orders.insert(order.id, order);
+                order.borrow_mut().id = orders.len();
+                orders.insert(order.borrow().id, order.clone());
             }
         }
         orders
@@ -76,7 +78,7 @@ mod tests {
     #[test]
     fn first_order_has_all_fields_filled() {
         let orders = Order::deserialize_all();
-        let order = &orders[&usize::MIN];
+        let order = &orders[&usize::MIN].borrow();
         assert_eq!(order.id, 0);
         assert_eq!(order.trader_name, "C1");
         assert_eq!(order.direction, Direction::Buy);

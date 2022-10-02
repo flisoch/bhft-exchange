@@ -30,8 +30,8 @@ impl Trader {
     }
 }
 
-impl Deserialize<String, Trader> for Trader {
-    fn deserialize(serialized_str: String) -> Trader {
+impl Deserialize<String, Rc<RefCell<Trader>>> for Trader {
+    fn deserialize(serialized_str: String) -> Rc<RefCell<Trader>> {
         let parts: Vec<&str> = serialized_str.split(' ').collect();
 
         let trader_name: String = parts[0].to_string();
@@ -47,22 +47,23 @@ impl Deserialize<String, Trader> for Trader {
             asset_name = asset_name.next();
         }
 
-        Trader {
+        let trader = Trader {
             name: trader_name,
             usd_balance: usd_balance,
             assets_count: assets_count,
             ..Default::default()
-        }
+        };
+        Rc::new(RefCell::new(trader))
     }
 
-    fn deserialize_all() -> HashMap<String, Trader> {
+    fn deserialize_all() -> HashMap<String, Rc<RefCell<Trader>>> {
         let mut traders = HashMap::new();
         let lines = Self::read_lines(Path::new("./resources/clients.txt"));
         for line in lines {
             if let Ok(serialized_trader) = line {
                 let mut trader = Self::deserialize(serialized_trader);
-                trader.id = traders.len();
-                traders.insert(trader.name.clone(), trader);
+                trader.borrow_mut().id = traders.len();
+                traders.insert(trader.borrow().name.clone(), trader.clone());
             }
         }
         traders
@@ -70,8 +71,6 @@ impl Deserialize<String, Trader> for Trader {
 }
 
 mod tests {
-    use std::hash::Hash;
-
     use super::*;
 
     #[test]
@@ -83,7 +82,7 @@ mod tests {
     #[test]
     fn first_trader_has_all_fields_filled() {
         let traders = Trader::deserialize_all();
-        let trader = &traders["C1"];
+        let trader = &traders["C1"].borrow();
 
         assert_eq!(trader.name, "C1");
         assert_eq!(trader.usd_balance, 1000);
@@ -96,10 +95,10 @@ mod tests {
         let serialized_str = "C1 1000 10 5 15 0".to_string();
         
         let trader = Trader::deserialize(serialized_str);
-        let assets = trader.assets_count;
+        let assets = &trader.borrow().assets_count;
 
-        assert_eq!(trader.name, "C1");
-        assert_eq!(trader.usd_balance, 1000u64);
+        assert_eq!(trader.borrow().name, "C1");
+        assert_eq!(trader.borrow().usd_balance, 1000u64);
         assert_eq!(assets.len(), 4);
     }
 

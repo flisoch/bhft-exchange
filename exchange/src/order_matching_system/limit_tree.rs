@@ -1,6 +1,8 @@
 use crate::order::*;
+use crate::trader::Trader;
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::rc::{Rc, Weak};
 
@@ -12,11 +14,15 @@ pub struct Limit {
 }
 
 pub struct LimitTree {
-    limits: BTreeMap<u64, Rc<RefCell<Limit>>>,
+    pub limits: BTreeMap<u64, Rc<RefCell<Limit>>>,
     direction: Direction,
 }
 
 impl LimitTree {
+    pub fn empty(&self) -> bool {
+        self.limits.is_empty()
+    }
+
     pub fn new(direction: Direction) -> Self {
         Self {
             limits: BTreeMap::new(),
@@ -42,7 +48,12 @@ impl LimitTree {
             self.limits.insert(price, Rc::new(RefCell::new(limit)));
         }
     }
-    pub fn market(&mut self, mut order: Rc<RefCell<Order>>, on_fill: &mut dyn FnMut(usize, usize)) {
+    pub fn market(
+        &mut self,
+        mut order: Rc<RefCell<Order>>,
+        users: &mut HashMap<String, Rc<RefCell<Trader>>>,
+        orders: &mut HashMap<usize, Rc<RefCell<Order>>>,
+    ) {
         let mut order_ref = order.borrow_mut();
         while (Self::matched(
             order_ref.price,
@@ -60,16 +71,16 @@ impl LimitTree {
             if (matched_order.borrow().amount >= order_ref.amount) {
                 if (matched_order.borrow().amount == order_ref.amount) {
                     self.finish(&matched_order);
-                    on_fill(matched_order.borrow().id, order_ref.id);
+                    self.on_fill(matched_order.borrow().id, order_ref.id, users, orders);
                 } else {
                     matched_order.borrow_mut().amount -= order_ref.amount;
                 }
-                on_fill(order_ref.id, order_ref.id);
+                self.on_fill(order_ref.id, order_ref.id, users, orders);
                 return;
             }
 
             self.finish(&matched_order);
-            on_fill(matched_order.borrow().id, order_ref.id);
+            self.on_fill(matched_order.borrow().id, order_ref.id, users, orders);
             order_ref.amount -= matched_order.borrow().amount;
         }
     }
@@ -88,6 +99,32 @@ impl LimitTree {
             self.limits.remove(&limit.borrow().price);
         } else {
             limit.borrow_mut().orders.pop_front();
+        }
+    }
+
+    fn on_fill(&mut self,
+        market_order_id: usize,
+        limit_order_id: usize,
+        traders: &mut HashMap<String, Rc<RefCell<Trader>>>,
+        orders: &mut HashMap<usize, Rc<RefCell<Order>>>,
+    ) {
+        if (market_order_id != limit_order_id) {
+            let mut market_order = orders[&market_order_id].clone();
+            let mut new_order = orders[&limit_order_id].clone();
+            let mut market_trader = traders[&market_order.borrow().trader_name].borrow_mut();
+            let mut new_trader = traders[&new_order.borrow().trader_name].borrow_mut();
+
+            if (market_order.borrow().direction == Direction::Buy) {
+                *market_trader.assets_count.get_mut(&market_order.borrow().asset).unwrap() += market_order.borrow().amount;
+                new_trader.usd_balance += market_order.borrow().price * market_order.borrow().amount;
+            }
+            else {
+                market_trader.usd_balance += market_order.borrow().amount * market_order.borrow().price;
+                *new_trader.assets_count.get_mut(&market_order.borrow().asset).unwrap() += market_order.borrow().amount;
+                new_trader.usd_balance += (new_order.borrow().price - market_order.borrow().price) * market_order.borrow().amount;
+            }
+            
+            orders.remove(&market_order_id);
         }
     }
 }
