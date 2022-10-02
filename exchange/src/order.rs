@@ -3,7 +3,6 @@ use crate::deserialize::Deserialize;
 use crate::order_book::*;
 use std::collections::HashMap;
 use std::default;
-use std::hash::Hash;
 use std::path::Path;
 use std::str::FromStr;
 use strum_macros::EnumString;
@@ -46,7 +45,6 @@ impl Deserialize<usize, Order> for Order {
             asset: asset,
             price: price,
             amount: amount,
-            limit: None,
         }
     }
 

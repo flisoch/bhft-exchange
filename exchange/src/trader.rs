@@ -1,8 +1,6 @@
 use asset_name::*;
 use std::collections::HashMap;
-use std::env;
 use std::fs::File;
-use std::hash::Hash;
 use std::io::{self, BufRead};
 use std::path::Path;
 

@@ -13,7 +13,7 @@ pub enum AssetName {
 
 impl AssetName {
     pub fn next(&self) -> Self {
-        use AssetName::*;
+        use self::AssetName::*;
         match *self {
             A => B,
             B => C,
