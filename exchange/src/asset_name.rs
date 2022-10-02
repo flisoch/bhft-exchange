@@ -1,8 +1,9 @@
 use std::str::FromStr;
 use strum_macros::EnumString;
 
-#[derive(Debug, Copy, Clone, Eq, Hash, PartialEq, EnumString)]
+#[derive(Debug, Default, Copy, Clone, Eq, Hash, PartialEq, EnumString)]
 pub enum AssetName {
+    #[default]
     A,
     B,
     C,
