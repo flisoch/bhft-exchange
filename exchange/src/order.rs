@@ -1,6 +1,6 @@
 use crate::asset_name::AssetName;
 use crate::deserialize::Deserialize;
-use crate::order_book::*;
+use crate::order_matching_system::*;
 use std::collections::HashMap;
 use std::default;
 use std::path::Path;
@@ -9,7 +9,7 @@ use strum_macros::EnumString;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
-#[derive(Debug, Default, EnumString, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, EnumString, PartialEq)]
 pub enum Direction {
     #[strum(serialize = "b")]
     #[default]
@@ -26,6 +26,7 @@ pub struct Order {
     pub asset: AssetName,
     pub price: u64,
     pub amount: u64,
+    pub limit: Option<Rc<RefCell<Limit>>>,
 }
 
 impl Deserialize<usize, Order> for Order {
@@ -45,6 +46,7 @@ impl Deserialize<usize, Order> for Order {
             asset: asset,
             price: price,
             amount: amount,
+            limit: None,
         }
     }
 
