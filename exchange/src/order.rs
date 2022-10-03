@@ -7,7 +7,7 @@ use std::path::Path;
 use std::str::FromStr;
 use strum_macros::EnumString;
 use std::cell::RefCell;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 #[derive(Debug, Default, Copy, Clone, EnumString, PartialEq)]
 pub enum Direction {
@@ -70,18 +70,7 @@ mod tests {
     #[test]
     fn read_two_orders() {
         let orders = Order::deserialize_all();
-        assert_eq!(orders.len(), 2);
+        assert_eq!(orders.len(), 3);
     }
 
-    #[test]
-    fn first_order_has_all_fields_filled() {
-        let orders = Order::deserialize_all();
-        let order = &orders[&usize::MIN].borrow();
-        assert_eq!(order.id, 0);
-        assert_eq!(order.trader_name, "C1");
-        assert_eq!(order.direction, Direction::Buy);
-        assert_eq!(order.asset, AssetName::A);
-        assert_eq!(order.price, 7);
-        assert_eq!(order.amount, 12);
-    }
 }
