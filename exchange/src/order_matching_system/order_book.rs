@@ -91,21 +91,25 @@ mod tests {
 
     #[test]
     fn orderbook_orders_len_increased_after_new_order_inserted() {
-        let mut orderbook = OrderBook::from_files();
-        orderbook.limit(&orderbook.orders[&usize::MIN].clone());
-        assert_eq!(orderbook.orders.len(), 1);
+        let mut order_book = OrderBook {
+            users: Trader::deserialize_all(),
+            ..Default::default()
+        };
+        let orders = Order::deserialize_all();
+        order_book.limit(&orders.iter().next().unwrap().1.clone());
+        assert_eq!(order_book.orders.len(), 1);
     }
 
     #[test]
     fn trader_balance_changed_after_new_buy_order_inserted() {
         let mut orderbook = OrderBook::from_files();
-
+        let balance_before = orderbook.users["C1"].borrow().usd_balance;
         orderbook.limit(&orderbook.orders[&usize::MIN].clone());
 
         let order: &Rc<RefCell<Order>> = &orderbook.orders[&usize::MIN];
         assert_eq!(
             orderbook.users["C1"].borrow().usd_balance,
-            1000 - order.as_ref().borrow().price * order.as_ref().borrow().amount
+            balance_before - order.as_ref().borrow().price * order.as_ref().borrow().amount
         );
     }
 }

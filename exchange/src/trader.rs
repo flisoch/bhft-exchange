@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn read_two_traders() {
         let traders = Trader::deserialize_all();
-        assert_eq!(traders.len(), 2);
+        assert_eq!(traders.len(), 3);
     }
 
     #[test]
@@ -136,7 +136,7 @@ mod tests {
         let trader = &traders["C1"].borrow();
 
         assert_eq!(trader.name, "C1");
-        assert_eq!(trader.usd_balance, 1000);
+        assert_eq!(trader.usd_balance, 2000);
         assert_eq!(trader.assets_count.len(), 4);
         assert_eq!(trader.assets_count[&AssetName::A], 10);
     }
