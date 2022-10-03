@@ -10,7 +10,8 @@ pub struct Limit {
     price: u64,
     volume: u64,
     //orders live longer than limits, so there's a weak ref
-    orders: VecDeque<Weak<RefCell<Order>>>,
+    // orders: VecDeque<Weak<RefCell<Order>>>,
+    orders: VecDeque<Rc<RefCell<Order>>>,
 }
 
 pub struct LimitTree {
@@ -30,58 +31,81 @@ impl LimitTree {
         }
     }
     pub fn new_limit(&mut self, mut order: Rc<RefCell<Order>>) {
-        let mut order_ref = order.borrow_mut();
-        if (self.limits.contains_key(&order_ref.price)) {
-            if let Some(limit) = self.limits.get_mut(&order_ref.price) {
-                limit.borrow_mut().volume += order_ref.amount;
-                limit.borrow_mut().orders.push_back(Rc::downgrade(&order));
-                order_ref.limit = Some(limit.clone());
+        // let mut order_ref = order.borrow_mut();
+        if (self.limits.contains_key(&order.borrow().price)) {
+            if let Some(limit) = self.limits.get_mut(&order.borrow().price) {
+                limit.borrow_mut().volume += order.borrow().amount;
+                // limit.borrow_mut().orders.push_back(Rc::downgrade(&order.clone()));
+                limit.borrow_mut().orders.push_back(order.clone());
+
+                // order.borrow_mut().limit = Some(limit.clone());
             }
         } else {
-            let price = order_ref.price;
+            let price = order.borrow().price;
             let mut limit = Limit {
                 price: price,
-                volume: order_ref.amount,
+                volume: order.borrow().amount,
                 orders: VecDeque::new(),
             };
-            limit.orders.push_back(Rc::downgrade(&order));
+            // limit.orders.push_back(Rc::downgrade(&order.clone()));
+            limit.orders.push_back(order.clone());
             self.limits.insert(price, Rc::new(RefCell::new(limit)));
         }
     }
     pub fn market(
         &mut self,
         mut order: Rc<RefCell<Order>>,
-        users: &mut HashMap<String, Rc<RefCell<Trader>>>,
-        orders: &mut HashMap<usize, Rc<RefCell<Order>>>,
+        users: &mut BTreeMap<String, Rc<RefCell<Trader>>>,
+        orders: &mut BTreeMap<usize, Rc<RefCell<Order>>>,
     ) {
-        let mut order_ref = order.borrow_mut();
+        let limit_order_id: usize;
+        let market_order_id: usize;
+
         while (Self::matched(
-            order_ref.price,
+            order.borrow().price,
             self.limits.iter().next().unwrap().0.clone(),
-            order_ref.direction,
+            order.borrow().direction,
         )) {
-            let matched_limit = self.limits.iter().next().unwrap().1;
-            let matched_order = matched_limit
-                .borrow_mut()
-                .orders
-                .front()
-                .unwrap()
-                .upgrade()
-                .unwrap();
-            if (matched_order.borrow().amount >= order_ref.amount) {
-                if (matched_order.borrow().amount == order_ref.amount) {
-                    self.finish(&matched_order);
-                    self.on_fill(matched_order.borrow().id, order_ref.id, users, orders);
+            let mut order_ref = order.borrow_mut();
+
+            let matched_limit = self.limits.iter().next().as_ref().unwrap().1.clone();
+            let matched_limit_ref = matched_limit.borrow_mut();
+            let mut matched_order = matched_limit_ref.orders.front().unwrap().clone();
+            let mut matched_order_ref = matched_order.borrow_mut();
+
+            if (matched_order_ref.amount >= order_ref.amount) {
+                market_order_id = matched_order_ref.id;
+                limit_order_id = order_ref.id;
+
+                if (matched_order_ref.amount == order_ref.amount) {
+                    drop(matched_limit_ref);
+                    drop(order_ref);
+                    drop(matched_order_ref);
+
+                    self.finish(matched_limit);
+                    self.on_fill(market_order_id, limit_order_id, users, orders);
                 } else {
-                    matched_order.borrow_mut().amount -= order_ref.amount;
+                    matched_order_ref.amount -= order_ref.amount;
+                    drop(order_ref);
+                    drop(matched_order_ref);
                 }
-                self.on_fill(order_ref.id, order_ref.id, users, orders);
+
+                todo!("calc correctly if market is Not filled, but new is");
+                // self.on_fill(limit_order_id, market_order_id, users, orders);
                 return;
             }
 
-            self.finish(&matched_order);
-            self.on_fill(matched_order.borrow().id, order_ref.id, users, orders);
-            order_ref.amount -= matched_order.borrow().amount;
+            drop(order_ref);
+            drop(matched_order_ref);
+            drop(matched_limit_ref);
+            self.finish(matched_limit);
+            self.on_fill(
+                matched_order.borrow().id,
+                matched_order.borrow().id,
+                users,
+                orders,
+            );
+            order.borrow_mut().amount -= matched_order.borrow().amount;
         }
     }
 
@@ -92,9 +116,7 @@ impl LimitTree {
         }
     }
 
-    fn finish(&mut self, order: &Rc<RefCell<Order>>) {
-        let order_ref = order.borrow();
-        let mut limit = order_ref.limit.as_ref().unwrap();
+    fn finish(&mut self, limit: Rc<RefCell<Limit>>) {
         if (limit.borrow().orders.len() == 1) {
             self.limits.remove(&limit.borrow().price);
         } else {
@@ -102,30 +124,39 @@ impl LimitTree {
         }
     }
 
-    fn on_fill(&mut self,
+    fn on_fill(
+        &mut self,
         market_order_id: usize,
         limit_order_id: usize,
-        traders: &mut HashMap<String, Rc<RefCell<Trader>>>,
-        orders: &mut HashMap<usize, Rc<RefCell<Order>>>,
+        traders: &mut BTreeMap<String, Rc<RefCell<Trader>>>,
+        orders: &mut BTreeMap<usize, Rc<RefCell<Order>>>,
     ) {
         if (market_order_id != limit_order_id) {
-            let mut market_order = orders[&market_order_id].clone();
-            let mut new_order = orders[&limit_order_id].clone();
-            let mut market_trader = traders[&market_order.borrow().trader_name].borrow_mut();
-            let mut new_trader = traders[&new_order.borrow().trader_name].borrow_mut();
+            let market_order = orders[&market_order_id].clone();
+            let market_order_ref = market_order.borrow();
+            let new_order = orders[&limit_order_id].clone();
+            let new_order_ref = new_order.borrow();
 
-            if (market_order.borrow().direction == Direction::Buy) {
-                *market_trader.assets_count.get_mut(&market_order.borrow().asset).unwrap() += market_order.borrow().amount;
-                new_trader.usd_balance += market_order.borrow().price * market_order.borrow().amount;
+            let mut market_trader = traders[&market_order_ref.trader_name].borrow_mut();
+            let mut new_trader = traders[&new_order_ref.trader_name].borrow_mut();
+
+            if (market_order_ref.direction == Direction::Buy) {
+                *market_trader
+                    .assets_count
+                    .get_mut(&market_order_ref.asset)
+                    .unwrap() += market_order_ref.amount;
+                new_trader.usd_balance += market_order_ref.price * market_order_ref.amount;
+            } else {
+                market_trader.usd_balance += market_order_ref.amount * market_order_ref.price;
+                *new_trader
+                    .assets_count
+                    .get_mut(&market_order_ref.asset)
+                    .unwrap() += market_order_ref.amount;
+                new_trader.usd_balance +=
+                    (new_order_ref.price - market_order_ref.price) * market_order_ref.amount;
             }
-            else {
-                market_trader.usd_balance += market_order.borrow().amount * market_order.borrow().price;
-                *new_trader.assets_count.get_mut(&market_order.borrow().asset).unwrap() += market_order.borrow().amount;
-                new_trader.usd_balance += (new_order.borrow().price - market_order.borrow().price) * market_order.borrow().amount;
-            }
-            
-            orders.remove(&market_order_id);
         }
+        orders.remove(&market_order_id);
     }
 }
 
