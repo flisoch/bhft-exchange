@@ -7,8 +7,6 @@ fn main() {
     };
     let orders = Order::deserialize_all();
 
-    Trader::serialize_all(&order_book.users);
-
     for (_key, order) in orders {
         order_book.limit(&order.clone());
     }

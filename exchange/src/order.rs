@@ -26,7 +26,6 @@ pub struct Order {
     pub asset: AssetName,
     pub price: u64,
     pub amount: u64,
-    // pub limit: Option<Rc<RefCell<Limit>>>,
 }
 
 impl Deserialize<usize, Rc<RefCell<Order>>> for Order {
@@ -47,7 +46,6 @@ impl Deserialize<usize, Rc<RefCell<Order>>> for Order {
             asset: asset,
             price: price,
             amount: amount,
-            // limit: None,
         };
         Rc::new(RefCell::new(order))
     }

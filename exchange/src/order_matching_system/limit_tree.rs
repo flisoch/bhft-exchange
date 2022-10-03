@@ -4,13 +4,11 @@ use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 
 pub struct Limit {
     price: u64,
     volume: u64,
-    //orders live longer than limits, so there's a weak ref
-    // orders: VecDeque<Weak<RefCell<Order>>>,
     orders: VecDeque<Rc<RefCell<Order>>>,
 }
 
@@ -31,14 +29,10 @@ impl LimitTree {
         }
     }
     pub fn new_limit(&mut self, mut order: Rc<RefCell<Order>>) {
-        // let mut order_ref = order.borrow_mut();
         if (self.limits.contains_key(&order.borrow().price)) {
             if let Some(limit) = self.limits.get_mut(&order.borrow().price) {
                 limit.borrow_mut().volume += order.borrow().amount;
-                // limit.borrow_mut().orders.push_back(Rc::downgrade(&order.clone()));
                 limit.borrow_mut().orders.push_back(order.clone());
-
-                // order.borrow_mut().limit = Some(limit.clone());
             }
         } else {
             let price = order.borrow().price;
@@ -47,7 +41,6 @@ impl LimitTree {
                 volume: order.borrow().amount,
                 orders: VecDeque::new(),
             };
-            // limit.orders.push_back(Rc::downgrade(&order.clone()));
             limit.orders.push_back(order.clone());
             self.limits.insert(price, Rc::new(RefCell::new(limit)));
         }
@@ -149,7 +142,6 @@ impl LimitTree {
                 donor_trader.usd_balance +=
                     (donor_order_ref.price - filled_order_ref.price) * filled_order_ref.amount;
             }
-        } else {
         }
         orders.remove(&filled_order_id);
     }

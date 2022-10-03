@@ -2,8 +2,8 @@ use crate::order::*;
 use crate::order_matching_system::limit_tree::*;
 use std::borrow::BorrowMut;
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
-use std::rc::{Rc, Weak};
+use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::deserialize::Deserialize;
 use crate::trader::Trader;
@@ -26,7 +26,6 @@ impl OrderBook {
     }
 
     pub fn limit(&mut self, order: &Rc<RefCell<Order>>) {
-        // todo pass orders to order book one by one or.. change api
         self.orders.insert(order.borrow().id, order.clone());
         self.users[&order.borrow().trader_name]
             .as_ref()
@@ -44,7 +43,7 @@ impl OrderBook {
             let buys_best_price = *self.buy_limits.borrow_mut().limits.iter().next().unwrap().0;
 
             if (order.borrow().price <= buys_best_price) {
-                //todo make closure or smth to not pass users&orders but pass closure on_fill from this scope
+                //todo make closure or smth to not pass users&orders but pass function on_fill with scope captured
                 self.buy_limits
                     .market(order.clone(), &mut self.users, &mut self.orders);
                 if (self.orders.contains_key(&order.borrow().id) && order.borrow().amount > 0) {
@@ -83,6 +82,7 @@ impl Default for OrderBook {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use crate::{asset_name::AssetName, deserialize::Deserialize, order, trader::Trader};
