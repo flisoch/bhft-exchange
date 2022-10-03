@@ -2,12 +2,12 @@
 extern crate strum;
 extern crate strum_macros;
 
-mod asset_name;
-mod trader;
-mod deserialize;
-mod order;
+pub mod asset_name;
+pub mod trader;
+pub mod deserialize;
+pub mod order;
+pub mod order_matching_system;
 
-use std::fs::File;
 
 #[cfg(test)]
 mod tests {
