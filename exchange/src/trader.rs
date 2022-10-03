@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::asset_name::{*, self};
+use crate::asset_name::*;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
