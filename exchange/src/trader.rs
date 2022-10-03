@@ -4,7 +4,7 @@ use crate::asset_name::*;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, LineWriter, Write};
 use std::path::Path;
 use std::rc::Rc;
 
@@ -40,9 +40,29 @@ impl Trader {
     }
 
     pub fn serialize_all(traders: &BTreeMap<String, Rc<RefCell<Trader>>>) {
+        let file = File::create("resources/clients_updated.txt").expect("Couldn't create file");
+        let mut file = LineWriter::new(file);
+
         for (name, trader) in traders {
-            println!("{:}", trader.as_ref().borrow());
+
+            let trader = trader.as_ref().borrow();
+            file.write(trader.name.as_bytes());
+            file.write(b" ");
+            file.write(trader.usd_balance.to_string().as_bytes());
+            file.write(b" ");
+
+            let mut asset_name = AssetName::A;
+            while asset_name != AssetName::Unknown {
+                let count = trader.assets_count[&asset_name];
+                file.write(count.to_string().as_bytes());
+                if (asset_name != AssetName::D) {
+                    file.write(b" ");
+                }
+                asset_name = asset_name.next();
+            }
+            file.write(b"\n");
         }
+        file.flush();
     }
 }
 

@@ -2,7 +2,7 @@
 extern crate strum;
 extern crate strum_macros;
 
-pub mod asset_name;
+mod asset_name;
 pub mod trader;
 pub mod deserialize;
 pub mod order;
