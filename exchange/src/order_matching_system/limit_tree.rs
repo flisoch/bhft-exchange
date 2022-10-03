@@ -61,11 +61,13 @@ impl LimitTree {
         let limit_order_id: usize;
         let market_order_id: usize;
 
-        while (Self::matched(
-            order.borrow().price,
-            self.limits.iter().next().unwrap().0.clone(),
-            order.borrow().direction,
-        )) {
+        while (!self.limits.is_empty()
+            && Self::matched(
+                order.borrow().price,
+                self.limits.iter().next().unwrap().0.clone(),
+                order.borrow().direction,
+            ))
+        {
             let mut order_ref = order.borrow_mut();
 
             let matched_limit = self.limits.iter().next().as_ref().unwrap().1.clone();
@@ -88,23 +90,15 @@ impl LimitTree {
                     matched_order_ref.amount -= order_ref.amount;
                     drop(order_ref);
                     drop(matched_order_ref);
+                    self.on_fill(limit_order_id, market_order_id, users, orders);
                 }
-
-                todo!("calc correctly if market is Not filled, but new is");
-                // self.on_fill(limit_order_id, market_order_id, users, orders);
                 return;
             }
-
             drop(order_ref);
             drop(matched_order_ref);
             drop(matched_limit_ref);
             self.finish(matched_limit);
-            self.on_fill(
-                matched_order.borrow().id,
-                matched_order.borrow().id,
-                users,
-                orders,
-            );
+            self.on_fill(matched_order.borrow().id, order.borrow().id, users, orders);
             order.borrow_mut().amount -= matched_order.borrow().amount;
         }
     }
@@ -126,37 +120,38 @@ impl LimitTree {
 
     fn on_fill(
         &mut self,
-        market_order_id: usize,
-        limit_order_id: usize,
+        filled_order_id: usize,
+        donor_order_id: usize,
         traders: &mut BTreeMap<String, Rc<RefCell<Trader>>>,
         orders: &mut BTreeMap<usize, Rc<RefCell<Order>>>,
     ) {
-        if (market_order_id != limit_order_id) {
-            let market_order = orders[&market_order_id].clone();
-            let market_order_ref = market_order.borrow();
-            let new_order = orders[&limit_order_id].clone();
-            let new_order_ref = new_order.borrow();
+        if (filled_order_id != donor_order_id) {
+            let filled_order = orders[&filled_order_id].clone();
+            let filled_order_ref = filled_order.borrow();
+            let donor_order = orders[&donor_order_id].clone();
+            let donor_order_ref = donor_order.borrow();
 
-            let mut market_trader = traders[&market_order_ref.trader_name].borrow_mut();
-            let mut new_trader = traders[&new_order_ref.trader_name].borrow_mut();
+            let mut filled_trader = traders[&filled_order_ref.trader_name].borrow_mut();
+            let mut donor_trader = traders[&donor_order_ref.trader_name].borrow_mut();
 
-            if (market_order_ref.direction == Direction::Buy) {
-                *market_trader
+            if (filled_order_ref.direction == Direction::Buy) {
+                *filled_trader
                     .assets_count
-                    .get_mut(&market_order_ref.asset)
-                    .unwrap() += market_order_ref.amount;
-                new_trader.usd_balance += market_order_ref.price * market_order_ref.amount;
+                    .get_mut(&filled_order_ref.asset)
+                    .unwrap() += filled_order_ref.amount;
+                donor_trader.usd_balance += filled_order_ref.price * filled_order_ref.amount;
             } else {
-                market_trader.usd_balance += market_order_ref.amount * market_order_ref.price;
-                *new_trader
+                filled_trader.usd_balance += filled_order_ref.amount * filled_order_ref.price;
+                *donor_trader
                     .assets_count
-                    .get_mut(&market_order_ref.asset)
-                    .unwrap() += market_order_ref.amount;
-                new_trader.usd_balance +=
-                    (new_order_ref.price - market_order_ref.price) * market_order_ref.amount;
+                    .get_mut(&filled_order_ref.asset)
+                    .unwrap() += filled_order_ref.amount;
+                donor_trader.usd_balance +=
+                    (donor_order_ref.price - filled_order_ref.price) * filled_order_ref.amount;
             }
+        } else {
         }
-        orders.remove(&market_order_id);
+        orders.remove(&filled_order_id);
     }
 }
 
