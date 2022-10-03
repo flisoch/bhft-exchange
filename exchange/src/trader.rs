@@ -1,6 +1,8 @@
-use asset_name::*;
+use std::fmt::Display;
+
+use crate::asset_name::*;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::Path;
@@ -9,7 +11,7 @@ use std::rc::Rc;
 use crate::deserialize::Deserialize;
 use crate::order::{Direction, Order};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct Trader {
     pub id: usize,
     pub name: String,
@@ -19,14 +21,43 @@ pub struct Trader {
 
 impl Trader {
     pub fn block_funds(&mut self, order: Rc<RefCell<Order>>) {
-        // todo: if order funds greater than user's, update order to user max available resources
-        // or throw exceptions
-        if (order.borrow().direction == Direction::Sell) {
-            *self.assets_count.get_mut(&order.borrow().asset).unwrap() -= order.borrow().amount;
+
+        let mut order_ref = order.borrow();
+        if (order_ref.direction == Direction::Sell) {
+            let success = self.assets_count.get_mut(&order_ref.asset).unwrap().checked_sub(order_ref.amount);
+            match success {
+                None => {
+                    //todo: update order somehow
+                    *self.assets_count.get_mut(&order_ref.asset).unwrap() = 0
+                },
+                Some(result) => *self.assets_count.get_mut(&order_ref.asset).unwrap() = result,
+            }
+        } else {
+            // todo: if order cost greater than user's usd_balance, update order to user max available resources
+            // or throw exceptions
+            self.usd_balance -= order_ref.amount * order_ref.price;
         }
-        else {
-            self.usd_balance -= order.borrow().amount * order.borrow().price;
+    }
+
+    pub fn serialize_all(traders: &BTreeMap<String, Rc<RefCell<Trader>>>) {
+        for (name, trader) in traders {
+            println!("{:}", trader.as_ref().borrow());
         }
+    }
+}
+
+impl std::fmt::Display for Trader {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "(value name: {}, value usd_balance: {}, value assets: (A: {}, B: {}, C: {}, D: {}))",
+            self.name,
+            self.usd_balance,
+            self.assets_count[&AssetName::A],
+            self.assets_count[&AssetName::B],
+            self.assets_count[&AssetName::C],
+            self.assets_count[&AssetName::D],
+        )
     }
 }
 
@@ -56,8 +87,8 @@ impl Deserialize<String, Rc<RefCell<Trader>>> for Trader {
         Rc::new(RefCell::new(trader))
     }
 
-    fn deserialize_all() -> HashMap<String, Rc<RefCell<Trader>>> {
-        let mut traders = HashMap::new();
+    fn deserialize_all() -> BTreeMap<String, Rc<RefCell<Trader>>> {
+        let mut traders = BTreeMap::new();
         let lines = Self::read_lines(Path::new("./resources/clients.txt"));
         for line in lines {
             if let Ok(serialized_trader) = line {
@@ -93,7 +124,7 @@ mod tests {
     #[test]
     fn deserialized_assets_len_equals_serialized() {
         let serialized_str = "C1 1000 10 5 15 0".to_string();
-        
+
         let trader = Trader::deserialize(serialized_str);
         let assets = &trader.borrow().assets_count;
 
@@ -104,20 +135,36 @@ mod tests {
 
     #[test]
     fn usd_balance_changes_after_buy() {
-        let order = Order {direction: Direction::Buy, amount: 12, price: 7, ..Default::default()};
-        let mut trader = Trader {usd_balance: 1000, ..Default::default()};
-        
+        let order = Order {
+            direction: Direction::Buy,
+            amount: 12,
+            price: 7,
+            ..Default::default()
+        };
+        let mut trader = Trader {
+            usd_balance: 1000,
+            ..Default::default()
+        };
+
         trader.block_funds(Rc::new(RefCell::new(order)));
 
-        assert_eq!(trader.usd_balance, 1000 - 12*7);
+        assert_eq!(trader.usd_balance, 1000 - 12 * 7);
     }
 
     #[test]
     fn asset_amount_changes_after_sell() {
-        let order = Order {direction: Direction::Sell, asset:AssetName::A, amount: 10, ..Default::default()};
+        let order = Order {
+            direction: Direction::Sell,
+            asset: AssetName::A,
+            amount: 10,
+            ..Default::default()
+        };
         let assets: HashMap<AssetName, u64> = [(AssetName::A, 10)].iter().cloned().collect();
-        let mut trader = Trader {assets_count: assets, ..Default::default()};
-        
+        let mut trader = Trader {
+            assets_count: assets,
+            ..Default::default()
+        };
+
         trader.block_funds(Rc::new(RefCell::new(order)));
 
         assert_eq!(trader.assets_count.iter().next().unwrap().1.clone(), 0);

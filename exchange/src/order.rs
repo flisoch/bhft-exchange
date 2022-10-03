@@ -1,7 +1,7 @@
 use crate::asset_name::AssetName;
 use crate::deserialize::Deserialize;
 use crate::order_matching_system::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::default;
 use std::path::Path;
 use std::str::FromStr;
@@ -52,8 +52,8 @@ impl Deserialize<usize, Rc<RefCell<Order>>> for Order {
         Rc::new(RefCell::new(order))
     }
 
-    fn deserialize_all() -> HashMap<usize, Rc<RefCell<Order>>> {
-        let mut orders = HashMap::new();
+    fn deserialize_all() -> BTreeMap<usize, Rc<RefCell<Order>>> {
+        let mut orders = BTreeMap::new();
         let lines = Self::read_lines(Path::new("./resources/orders.txt"));
         for line in lines {
             if let Ok(serialized_order) = line {
